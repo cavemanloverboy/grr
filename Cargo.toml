@@ -1,0 +1,6 @@
+[workspace]
+members = ["core", "geodesic"]
+
+
+[workspace.dependencies]
+grr-core = { path = "core" }
