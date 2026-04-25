@@ -145,9 +145,9 @@ pub fn integrate_geodesic_dp54<F: MetricField>(
             // accept
             n_accepted += 1;
             lambda += dl;
-            state = State(new_state);
 
             if let Some(reason) = TerminationReason::check(cfg, &new_state, &state.0) {
+                state = State(new_state);
                 return GeodesicResult {
                     final_state: state,
                     final_lambda: lambda,
@@ -157,6 +157,7 @@ pub fn integrate_geodesic_dp54<F: MetricField>(
                 };
             }
             // commit and continue
+            state = State(new_state);
             k1 = k7;
             dl *= ctrl.factor(err_norm, err_prev);
             err_prev = err_norm.max(1e-4);
