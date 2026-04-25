@@ -163,3 +163,78 @@ mod dp54 {
         assert!((r - 1.0).abs() < 1e-7, "radius drifted: {r}");
     }
 }
+
+mod dp87 {
+    use std::f64::consts::PI;
+
+    use grr_integrator::dp87::{Dp87Controller, dp87_integrator};
+
+    use super::*;
+
+    #[test]
+    fn test_dp87_harmonic_oscillator() {
+        // Starts at rest at x=1
+        let t = 0.0;
+        let state = [1.0, 0.0];
+        let t_end = 100.0 * (2.0 * PI);
+        let dt = 0.01;
+
+        // Integrate via dp87
+        let integrand = harmonic_oscillator;
+        let ctrl = Dp87Controller {
+            atol: 1e-10,
+            rtol: 1e-10,
+            safety: 0.5,
+            ..Default::default()
+        };
+        let end_state = dp87_integrator(integrand, state, t, t_end, dt, &ctrl);
+
+        // Assert this is near the original state
+        let near_orig_state = approx_eq(state, end_state, 1e-6);
+        assert!(near_orig_state, "{state:?}!={end_state:?}");
+    }
+
+    #[test]
+    fn test_dp87_kepler_circular_orbit() {
+        // Starts at x=1, going in +y direction
+        let t = 0.0;
+        let state = [1.0, 0.0, 0.0, 1.0];
+        let t_end = 100.0 * (2.0 * PI);
+        let dt = 0.01;
+
+        // Integrate via dp87
+        let integrand = kepler_2d;
+        let ctrl = Dp87Controller {
+            atol: 1e-10,
+            rtol: 1e-10,
+            safety: 0.5,
+            ..Default::default()
+        };
+        let end_state = dp87_integrator(integrand, state, t, t_end, dt, &ctrl);
+
+        // Assert this is near the original state
+        let near_orig_state = approx_eq(state, end_state, 1e-6);
+        assert!(near_orig_state, "{state:?}!={end_state:?}");
+
+        let e0 = kepler_energy(state);
+        let e1 = kepler_energy(end_state);
+        let l0 = kepler_angular_momentum(state);
+        let l1 = kepler_angular_momentum(end_state);
+        let [x, y, _, _] = end_state;
+        let r = (x * x + y * y).sqrt();
+
+        // Tolerances chosen ~2 orders looser than rtol to account for
+        // accumulation over ~10^4-10^5 steps.
+        assert!(
+            (e1 - e0).abs() < 1e-8,
+            "energy not conserved: {e0} -> {e1}, drift = {:e}",
+            e1 - e0
+        );
+        assert!(
+            (l1 - l0).abs() < 1e-8,
+            "L not conserved: {l0} -> {l1}, drift = {:e}",
+            l1 - l0
+        );
+        assert!((r - 1.0).abs() < 1e-7, "radius drifted: {r}");
+    }
+}

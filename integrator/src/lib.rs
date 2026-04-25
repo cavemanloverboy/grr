@@ -11,4 +11,5 @@
 //! Example: for some y'(t) = t
 
 pub mod dp54;
+pub mod dp87;
 pub mod rk4;
