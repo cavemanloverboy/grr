@@ -122,7 +122,11 @@ pub fn integrate_geodesic_dp54<F: MetricField>(
     let mut k1 = integrand(lambda, &state.0);
     let mut err_prev: f64 = 1.0;
 
+    // never step more than 5% of cam distance
+    let max_dl = 0.05 * cfg.r_cam;
     loop {
+        dl = dl.min(max_dl);
+
         // TODO (remove): debug
         if n_accepted + n_rejected >= cfg.max_steps {
             return GeodesicResult {
