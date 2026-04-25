@@ -35,7 +35,7 @@ pub fn dp54_integrator<const N: usize>(
 
 // TODO (perf): reuse arrays
 #[rustfmt::skip]
-fn dp54_step<F: Fn(f64, &[f64; N]) -> [f64; N], const N: usize>(
+pub fn dp54_step<F: Fn(f64, &[f64; N]) -> [f64; N], const N: usize>(
     f: &F,
     t: f64,
     y: &[f64; N],
