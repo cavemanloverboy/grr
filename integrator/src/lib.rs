@@ -9,6 +9,6 @@
 //! Specify a problem with a closure of type `Fn(f64, &[f64; N]) -> [f64; N]`.
 //!
 //! Example: for some y'(t) = t
-#![no_std]
 
+pub mod dp54;
 pub mod rk4;
