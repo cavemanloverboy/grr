@@ -11,6 +11,7 @@ name = "grr-geodesic"
 version = "0.1.0"
 dependencies = [
  "grr-core",
+ "grr-integrator",
 ]
 
 [[package]]

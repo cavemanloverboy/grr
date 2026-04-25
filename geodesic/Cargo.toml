@@ -5,3 +5,4 @@ edition = "2024"
 
 [dependencies]
 grr-core = { workspace = true }
+grr-integrator = { workspace = true }

@@ -4,3 +4,4 @@ members = ["core", "geodesic", "integrator"]
 
 [workspace.dependencies]
 grr-core = { path = "core" }
+grr-integrator = { path = "integrator" }

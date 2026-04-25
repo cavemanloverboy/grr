@@ -103,7 +103,7 @@ impl Dp54Controller {
     }
 
     /// Scaled RMS error norm. ≤ 1 means accept.
-    fn err_norm<const N: usize>(&self, y: &[f64; N], y_new: &[f64; N], err: &[f64; N]) -> f64 {
+    pub fn err_norm<const N: usize>(&self, y: &[f64; N], y_new: &[f64; N], err: &[f64; N]) -> f64 {
         let mut sumsq = 0.0;
         for i in 0..N {
             let sc = self.atol + self.rtol * y[i].abs().max(y_new[i].abs());
@@ -114,7 +114,7 @@ impl Dp54Controller {
     }
 
     /// Returns the multiplicative factor to apply to `dt`, clamped.
-    fn factor(&self, err_norm: f64, err_prev: f64) -> f64 {
+    pub fn factor(&self, err_norm: f64, err_prev: f64) -> f64 {
         let raw = if err_norm == 0.0 {
             self.max_factor
         } else {
