@@ -1,3 +1,5 @@
+//! TODO (feat): need to add conserved quantity monitoring
+
 use std::f64::consts::PI;
 
 use grr_core::math::field::MetricField;
@@ -95,6 +97,7 @@ impl TerminationReason {
         let within_ring = (*r >= cfg.r_in) && *r <= cfg.r_out;
         let equatorial_crossing_event = th_crossed && within_ring;
         if equatorial_crossing_event {
+            // TODO: bisect to find exact λ_crossing
             return Some(TerminationReason::EquatorialCrossingEvent);
         }
 
