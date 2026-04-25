@@ -12,3 +12,7 @@ version = "0.1.0"
 dependencies = [
  "grr-core",
 ]
+
+[[package]]
+name = "grr-integrator"
+version = "0.1.0"

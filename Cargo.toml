@@ -1,5 +1,5 @@
 [workspace]
-members = ["core", "geodesic"]
+members = ["core", "geodesic", "integrator"]
 
 
 [workspace.dependencies]
