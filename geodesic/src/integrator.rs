@@ -8,11 +8,11 @@ use grr_integrator::dp54::{Dp54Controller, dp54_step};
 use crate::state::State;
 
 /// BoydLindquist goes crazy ar r=r_plus so we gotta stop before then
-const TERMINATION_RADIUS: f64 = 1.01;
+pub const TERMINATION_RADIUS_FACTOR: f64 = 1.01;
 
 pub struct GeodesicConfig {
     /// outer horizon radius (depends on metric). p
-    /// photon terminates when r < TERMINATION_RADIUS * r_plus.
+    /// photon terminates when r < TERMINATION_RADIUS_FACTOR * r_plus.
     pub r_plus: f64,
     /// Camera radius. Photon escapes when r > 2 * r_cam AND k^r > 0.
     pub r_cam: f64,
@@ -24,6 +24,7 @@ pub struct GeodesicConfig {
     pub max_steps: usize,
 }
 
+#[derive(Debug)]
 pub struct GeodesicResult {
     pub final_state: State,
     pub final_lambda: f64,
@@ -32,9 +33,10 @@ pub struct GeodesicResult {
     pub n_rejected: usize,
 }
 
+#[derive(Debug, PartialEq, Eq)]
 pub enum TerminationReason {
     /// Triggers:
-    ///  1. r drops below TERMINATION_RADIUS * r_plus (outer horizon).
+    ///  1. r drops below TERMINATION_RADIUS_FACTOR * r_plus (outer horizon).
     ///
     /// Note: 1% buffer keeps us in regular coordinates — at r = r_plus
     /// exactly, the BL metric is singular and the integrator stalls or NaNs.
@@ -76,8 +78,8 @@ impl TerminationReason {
         let old_th = old_state[2];
 
         // check HorizonEvent
-        // 1. r drops below TERMINATION_RADIUS * r_plus (outer horizon).
-        let horizon_event = *r < TERMINATION_RADIUS * cfg.r_plus;
+        // 1. r drops below TERMINATION_RADIUS_FACTOR * r_plus (outer horizon).
+        let horizon_event = *r < TERMINATION_RADIUS_FACTOR * cfg.r_plus;
         if horizon_event {
             return Some(TerminationReason::HorizonEvent);
         }
