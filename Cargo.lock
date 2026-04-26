@@ -17,3 +17,10 @@ dependencies = [
 [[package]]
 name = "grr-integrator"
 version = "0.1.0"
+
+[[package]]
+name = "grr-tetrad"
+version = "0.1.0"
+dependencies = [
+ "grr-core",
+]
