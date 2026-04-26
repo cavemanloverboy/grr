@@ -10,3 +10,7 @@ grr-disk = { workspace = true }
 grr-geodesic = { workspace = true }
 grr-integrator = { workspace = true }
 grr-tetrad = { workspace = true }
+grr-png = { workspace = true }
+
+[profile.release]
+debug = true

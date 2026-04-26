@@ -30,7 +30,7 @@ impl<'a, F: MetricField> RenderInputs<'a, F> {
     }
 }
 // TODO (cleanup): move this into spacetimes probably
-fn r_plus(a_star: f64) -> f64 {
+pub fn r_plus(a_star: f64) -> f64 {
     1.0 + (1.0 - a_star * a_star).sqrt()
 }
 
@@ -53,7 +53,7 @@ fn render_pixel<F: MetricField>(
     let initial_state = State::new(x_cam, k_cam);
 
     // integrate geodesic
-    let dl = 1e-3;
+    let dl = 1e-5;
     let result = integrate_geodesic_dp54(inputs.field, initial_state, dl, &ctrl, &cfg);
 
     // color pixel based on outcome
@@ -62,7 +62,7 @@ fn render_pixel<F: MetricField>(
         TerminationReason::HorizonEvent => 0.0,
 
         // TODO: some background image
-        TerminationReason::EscapeEvent => 0.1,
+        TerminationReason::EscapeEvent => 0.0,
 
         // bolometric intensity + redshift for thin disk model
         TerminationReason::EquatorialCrossingEvent => {
@@ -90,6 +90,7 @@ pub fn render<F: MetricField + Sync>(inputs: &RenderInputs<F>) -> RenderedImage 
     let ctrl = Dp54Controller {
         atol: 1e-10,
         rtol: 1e-10,
+        safety: 0.25,
         ..Default::default()
     };
     let cfg = inputs.geodesic_config();
