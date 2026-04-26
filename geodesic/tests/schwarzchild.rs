@@ -9,6 +9,10 @@ use grr_geodesic::{
 };
 use grr_integrator::dp54::Dp54Controller;
 
+fn approx_eq(a: f64, b: f64, tol: f64) -> bool {
+    (a - b).abs() < tol
+}
+
 #[test]
 #[rustfmt::skip]
 fn test_schwarzchild_intersect_horizon() {
@@ -49,4 +53,9 @@ fn test_schwarzchild_intersect_horizon() {
     // geodesic still null
     let norm_sq = result.final_state.norm_squared(&field);
     assert!(norm_sq < 1e-6, "geodesic not null {norm_sq}");
+
+    // energy conserved
+    let orig_energy = state.energy(&field);
+    let final_energy = result.final_state.energy(&field);
+    assert!(approx_eq(orig_energy, final_energy, 1e-8), "energy not conserved");
 }
