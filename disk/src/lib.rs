@@ -1,3 +1,5 @@
+use grr_core::math::{Vector, field::MetricField, metric::Metric};
+
 pub struct Disk {
     pub r_in: f64,
     pub r_out: f64,
@@ -6,8 +8,8 @@ pub struct Disk {
 
 #[repr(C)]
 pub struct ISCO {
-    prograde: f64,
-    retrograde: f64,
+    pub prograde: f64,
+    pub retrograde: f64,
 }
 
 /// for kerr with spin a, r_isco given by:
@@ -29,4 +31,41 @@ pub fn r_isco(a: f64) -> ISCO {
         prograde,
         retrograde,
     }
+}
+
+fn keplerian_omega(r: f64, a: f64) -> f64 {
+    1.0 / (r.powf(1.5) + a)
+}
+
+pub fn fluid_4velocity<F: MetricField>(field: &F, r: f64, a: f64) -> Vector {
+    let omega = keplerian_omega(r, a);
+    let x = [0.0, r, core::f64::consts::FRAC_PI_2, 0.0];
+    let metric = field.metric_at(&x);
+    let unnorm = [1.0, 0.0, 0.0, omega];
+    let norm_sq = metric.dot(&unnorm, &unnorm);
+    debug_assert!(
+        norm_sq < 0.0,
+        "fluid 4-velocity not timelike at r={r}, a={a}: u*u_unnorm = {norm_sq}"
+    );
+    let u_t = (-norm_sq).sqrt().recip();
+    [u_t, 0.0, 0.0, omega * u_t]
+}
+
+/// computes g = ν_obs / ν_em.
+/// the observed value is ν = -k_μ u^μ, so
+///
+/// g = ν_obs / ν_em
+///   = (-k_μ u^μ_obs) / (-k_μ u^μ_em)
+// /  = (k_μ u^μ_obs) / (k_μ u^μ_em)
+pub fn redshift_factor<F: MetricField>(
+    field: &F,
+    x_hit: &Vector,
+    k_hit: &Vector,
+    u_emitter: &Vector,
+    u_observer: &Vector,
+) -> f64 {
+    let metric = field.metric_at(x_hit);
+    let k_dot_u_em = metric.dot(k_hit, u_emitter);
+    let k_dot_u_obs = metric.dot(k_hit, u_observer);
+    k_dot_u_obs / k_dot_u_em
 }
