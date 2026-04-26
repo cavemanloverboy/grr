@@ -1,4 +1,5 @@
-use grr_core::math::{metric::Metric, spacetimes::schwarzchild::Schwarzschild};
+use grr_core::math::{field::MetricField, metric::Metric, spacetimes::schwarzchild::Schwarzschild};
+use grr_tetrad::zamo_tetrad;
 
 use super::*;
 
@@ -41,11 +42,14 @@ fn tetrad_direction_is_always_null() {
 
 #[test]
 fn coordinate_momentum_is_null_in_curved_spacetime() {
-    let cam = Camera::new(1000.0, 85.0_f64.to_radians());
+    let r_cam = 1000.0;
+    let th_cam = 85.0_f64.to_radians();
+    let cam = Camera::new(r_cam, th_cam);
     let field = Schwarzschild;
+    let tetrad = zamo_tetrad(&field, &[0.0, r_cam, th_cam, 0.0]);
     for j in (0..cam.height as usize).step_by(50) {
         for i in (0..cam.width as usize).step_by(50) {
-            let (x, k) = cam.pixel_to_initial_state(&field, i, j);
+            let (x, k) = cam.pixel_to_initial_state(&tetrad, i, j);
             let norm = field.metric_at(&x).dot(&k, &k);
             assert!(norm.abs() < 1e-10, "k not null at ({i}, {j}): k*k = {norm}");
         }
