@@ -103,7 +103,7 @@ impl Camera {
         let mut k = [0.0; 4];
         for a in 0..4 {
             for mu in 0..4 {
-                k[mu] += n[a] * tetrad.legs[a][mu];
+                k[mu] += -n[a] * tetrad.legs[a][mu];
             }
         }
         k
