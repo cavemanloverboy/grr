@@ -19,7 +19,8 @@ a quick exercise in shape rotating.
     - [x] bolometric flux
     - [ ] spectral flux
 - [x] camera
-- [ ] render
+- [x] png
+- [x] render
 
 this v0 gets us static systems, no grmhd
 
