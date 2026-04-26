@@ -1,0 +1,15 @@
+[package]
+name = "grr-wasm"
+version = "0.1.0"
+edition = "2024"
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+grr-core = { path = "../core" }
+grr-geodesic = { path = "../geodesic" }
+grr-integrator = { path = "../integrator" }
+grr-tetrad = { path = "../tetrad" }
+grr-camera = { path = "../camera" }
+wasm-bindgen = "0.2"

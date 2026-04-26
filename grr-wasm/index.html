@@ -1,0 +1,400 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>grr - Gravitational Lensing</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { background: #000; overflow: hidden; font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace; }
+  canvas { display: block; }
+
+  #panel {
+    position: fixed; top: 16px; right: 16px;
+    background: rgba(8, 8, 18, 0.88);
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(255,255,255,0.07);
+    border-radius: 10px;
+    padding: 16px 20px;
+    color: #999; font-size: 11px; line-height: 1.5;
+    min-width: 260px; z-index: 10;
+  }
+  #panel h2 { color: #fff; font-size: 13px; margin-bottom: 10px; font-weight: 600; }
+  .row {
+    display: flex; align-items: center; justify-content: space-between;
+    margin: 5px 0;
+  }
+  .row label { flex: 0 0 80px; color: #777; }
+  .row input[type="range"] { flex: 1; margin: 0 8px; accent-color: #ff8800; }
+  .row .val { flex: 0 0 40px; text-align: right; color: #ddd; }
+  #stats {
+    margin-top: 10px; padding-top: 10px;
+    border-top: 1px solid rgba(255,255,255,0.06);
+    font-size: 10px; color: #555; line-height: 1.7;
+  }
+  #stats span { color: #999; }
+
+  #legend {
+    position: fixed; bottom: 16px; left: 16px;
+    background: rgba(8, 8, 18, 0.8);
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(255,255,255,0.05);
+    border-radius: 8px;
+    padding: 12px 16px;
+    color: #888; font-size: 11px; line-height: 2;
+    pointer-events: none; user-select: none; z-index: 10;
+  }
+  #legend b { color: #ccc; font-size: 12px; }
+  .sw {
+    display: inline-block; width: 8px; height: 8px;
+    border-radius: 50%; margin-right: 6px; vertical-align: middle;
+  }
+  .line-sw {
+    display: inline-block; width: 14px; height: 2px;
+    margin-right: 6px; vertical-align: middle;
+  }
+</style>
+</head>
+<body>
+
+<div id="panel">
+  <h2>photon lensing</h2>
+  <div class="row">
+    <label>spin a</label>
+    <input type="range" id="sSpin" min="0" max="0.98" step="0.01" value="0">
+    <span class="val" id="vSpin">0.00</span>
+  </div>
+  <div class="row">
+    <label>rays</label>
+    <input type="range" id="sRays" min="8" max="80" step="1" value="30">
+    <span class="val" id="vRays">30</span>
+  </div>
+  <div class="row">
+    <label>max b/M</label>
+    <input type="range" id="sMaxB" min="2" max="20" step="0.5" value="12">
+    <span class="val" id="vMaxB">12.0</span>
+  </div>
+  <div class="row">
+    <label>source r/M</label>
+    <input type="range" id="sDist" min="20" max="80" step="5" value="40">
+    <span class="val" id="vDist">40</span>
+  </div>
+  <div class="row">
+    <label>speed</label>
+    <input type="range" id="sSpeed" min="0" max="8" step="0.5" value="3">
+    <span class="val" id="vSpeed">3.0</span>
+  </div>
+  <div id="stats">
+    r<sub>+</sub> = <span id="iHorizon">2.000</span> &ensp;
+    r<sub>isco</sub> = <span id="iIsco">6.000</span><br>
+    b<sub>crit</sub> &asymp; <span id="iBcrit">5.196</span>
+  </div>
+</div>
+
+<div id="legend">
+  <b>grr</b> &mdash; geodesics in curved spacetime<br>
+  rust/wasm + three.js<br><br>
+  <span class="sw" style="background:#00ccff"></span>ISCO circular orbit<br>
+  <span class="sw" style="background:#ffcc00"></span>photon sphere (unstable)<br>
+  <span class="sw" style="background:#7744dd"></span>precessing orbit (GR rosette)<br>
+  <span class="line-sw" style="background:#cc3300"></span>captured (b &lt; b<sub>crit</sub>)<br>
+  <span class="line-sw" style="background:#ff8800"></span>near-critical (b &asymp; b<sub>crit</sub>)<br>
+  <span class="line-sw" style="background:#2288aa"></span>deflected (b &gt; b<sub>crit</sub>)<br>
+  <span class="sw" style="background:#fff"></span>tracer particle<br>
+</div>
+
+<script type="importmap">
+{ "imports": {
+    "three": "https://cdn.jsdelivr.net/npm/three@0.169.0/build/three.module.js",
+    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.169.0/examples/jsm/"
+}}
+</script>
+
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
+import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
+import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
+import init, {
+  circular_orbit_ic, photon_sphere_ic,
+  trace_schwarzschild, trace_kerr,
+  solve_schwarzschild_state, solve_kerr_state,
+  isco_radius, horizon_radius,
+} from './pkg/grr_wasm.js';
+
+await init();
+
+// ── Slider elements ─────────────────────────────────────
+const $ = id => document.getElementById(id);
+const sSpin = $('sSpin'), sRays = $('sRays'), sMaxB = $('sMaxB'), sDist = $('sDist'), sSpeed = $('sSpeed');
+const vSpin = $('vSpin'), vRays = $('vRays'), vMaxB = $('vMaxB'), vDist = $('vDist'), vSpeed = $('vSpeed');
+
+let spin = 0, numRays = 30, maxB = 12, srcR = 40, animSpeed = 3;
+
+// ── Scene ───────────────────────────────────────────────
+const scene = new THREE.Scene();
+const camera = new THREE.PerspectiveCamera(50, innerWidth / innerHeight, 0.1, 2000);
+camera.position.set(8, 6, 28);
+camera.up.set(0, 0, 1);
+
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setSize(innerWidth, innerHeight);
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+document.body.appendChild(renderer.domElement);
+
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.enableDamping = true;
+controls.dampingFactor = 0.05;
+
+const composer = new EffectComposer(renderer);
+composer.addPass(new RenderPass(scene, camera));
+composer.addPass(new UnrealBloomPass(
+  new THREE.Vector2(innerWidth, innerHeight), 0.5, 0.3, 0.15
+));
+
+// ── Stars ───────────────────────────────────────────────
+{
+  const N = 4000, p = new Float32Array(N * 3);
+  for (let i = 0; i < N * 3; i += 3) {
+    const th = Math.acos(2 * Math.random() - 1);
+    const ph = Math.random() * 2 * Math.PI;
+    const r = 300 + Math.random() * 400;
+    p[i] = r * Math.sin(th) * Math.cos(ph);
+    p[i+1] = r * Math.sin(th) * Math.sin(ph);
+    p[i+2] = r * Math.cos(th);
+  }
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.BufferAttribute(p, 3));
+  scene.add(new THREE.Points(g, new THREE.PointsMaterial({ color: 0xffffff, size: 0.4, sizeAttenuation: true })));
+}
+
+// ── Scene groups ────────────────────────────────────────
+const bhGroup = new THREE.Group();
+const orbitGroup = new THREE.Group();
+const photonGroup = new THREE.Group();
+scene.add(bhGroup, orbitGroup, photonGroup);
+
+// ── Tracer state ────────────────────────────────────────
+const dotGeo = new THREE.SphereGeometry(0.15, 8, 6);
+const dotMat = new THREE.MeshBasicMaterial({ color: 0xffffff });
+const orbitTracers = [];
+const photonTracers = [];
+let photonTime = 0;
+
+// ── Helpers ─────────────────────────────────────────────
+function clearGroup(group) {
+  while (group.children.length) {
+    const c = group.children[0];
+    group.remove(c);
+    if (c.geometry) c.geometry.dispose();
+    if (c.material) c.material.dispose();
+  }
+}
+
+function extractPoints(result) {
+  const src = result.points;
+  const buf = new Float32Array(src.length);
+  for (let i = 0; i < src.length; i++) buf[i] = src[i];
+  const nPts = result.num_points;
+  const term = result.termination;
+  result.free();
+  return { buf, nPts, term };
+}
+
+function addOrbitLine(points, color, speed) {
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.BufferAttribute(points, 3));
+  orbitGroup.add(new THREE.Line(geo, new THREE.LineBasicMaterial({ color, transparent: true, opacity: 0.6 })));
+  const dot = new THREE.Mesh(dotGeo, dotMat.clone());
+  orbitGroup.add(dot);
+  orbitTracers.push({ points, dot, nPts: points.length / 3, speed, t: Math.random() * points.length / 3 });
+}
+
+function doTrace(state, lambdaEnd, tol, maxSteps, sampleEvery) {
+  return spin === 0
+    ? trace_schwarzschild(state, lambdaEnd, tol, maxSteps, sampleEvery)
+    : trace_kerr(spin, state, lambdaEnd, tol, maxSteps, sampleEvery);
+}
+
+// Build photon state in 3D: impact parameter b at angle alpha in the impact plane.
+// alpha=0 → equatorial (k^phi only), alpha=pi/2 → polar (k^theta only).
+function photonState3D(r0, b, alpha) {
+  const b_phi = b * Math.cos(alpha);
+  const b_theta = b * Math.sin(alpha);
+  const b_total = Math.abs(b);
+
+  const f = 1 - 2 / r0;
+  const kphi = b_phi / (r0 * r0);
+  const ktheta = b_theta / (r0 * r0);
+  const kr2 = 1 - b_total * b_total * f / (r0 * r0);
+  const kr = kr2 > 0 ? -Math.sqrt(kr2) : -1e-6;
+
+  return spin === 0
+    ? solve_schwarzschild_state(r0, Math.PI / 2, 0, kr, ktheta, kphi, true)
+    : solve_kerr_state(spin, r0, Math.PI / 2, 0, kr, ktheta, kphi, true);
+}
+
+// ── Build functions ─────────────────────────────────────
+function rebuildBH() {
+  clearGroup(bhGroup);
+  const rh = horizon_radius(spin);
+  bhGroup.add(new THREE.Mesh(
+    new THREE.SphereGeometry(rh, 64, 32),
+    new THREE.MeshBasicMaterial({ color: 0x000000 })
+  ));
+  const psIc = photon_sphere_ic(spin, true);
+  const rps = psIc[1];
+  bhGroup.add(new THREE.Mesh(
+    new THREE.SphereGeometry(rps, 24, 12),
+    new THREE.MeshBasicMaterial({ color: 0x332200, wireframe: true, transparent: true, opacity: 0.05 })
+  ));
+}
+
+function rebuildOrbits() {
+  clearGroup(orbitGroup);
+  orbitTracers.length = 0;
+
+  const ri = isco_radius(spin, true);
+  const iscoIc = circular_orbit_ic(spin, ri + 0.01, true);
+  const isco = extractPoints(doTrace(iscoIc, 6500, 1e-12, 2000000, 3));
+  addOrbitLine(isco.buf, 0x00ccff, 1.5);
+
+  const psIc = photon_sphere_ic(spin, true);
+  const ps = extractPoints(doTrace(psIc, 80, 1e-14, 1000000, 1));
+  addOrbitLine(ps.buf, 0xffcc00, 2.0);
+
+  const circIc = circular_orbit_ic(spin, 10, true);
+  const uphi95 = circIc[7] * 0.95;
+  const precIc = spin === 0
+    ? solve_schwarzschild_state(10, Math.PI / 2, 0, 0, 0, uphi95, false)
+    : solve_kerr_state(spin, 10, Math.PI / 2, 0, 0, 0, uphi95, false);
+  const prec = extractPoints(doTrace(precIc, 25000, 1e-12, 2000000, 8));
+  addOrbitLine(prec.buf, 0x7744dd, 3.0);
+}
+
+function rebuildPhotons() {
+  clearGroup(photonGroup);
+  photonTracers.length = 0;
+  photonTime = 0;
+
+  const bc = 3 * Math.sqrt(3);
+  const golden = (1 + Math.sqrt(5)) / 2;
+
+  for (let i = 0; i < numRays; i++) {
+    // Sunflower / Fibonacci spiral in impact parameter disk
+    // Distributes points uniformly across a disk of radius maxB
+    const r_frac = Math.sqrt((i + 0.5) / numRays);
+    const b = maxB * r_frac;
+    const alpha = 2 * Math.PI * i / (golden * golden);
+
+    const st = photonState3D(srcR, b, alpha);
+    const result = doTrace(st, 600, 1e-11, 500000, 2);
+    const { buf, nPts, term } = extractPoints(result);
+
+    const captured = term === 'horizon';
+    const nearCrit = nPts > 400;
+
+    let color;
+    if (nearCrit) {
+      color = new THREE.Color(0xff8800);
+    } else if (captured) {
+      const s = b / bc;
+      color = new THREE.Color().setHSL(0.02, 0.8, 0.2 + s * 0.15);
+    } else {
+      const s = Math.min((b - bc) / (maxB - bc), 1);
+      color = new THREE.Color().setHSL(0.5 + s * 0.08, 0.55, 0.35 + s * 0.1);
+    }
+
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.BufferAttribute(buf, 3));
+    photonGroup.add(new THREE.Line(geo, new THREE.LineBasicMaterial({ color, transparent: true, opacity: 0.7 })));
+
+    const dot = new THREE.Mesh(dotGeo, dotMat.clone());
+    dot.visible = false;
+    photonGroup.add(dot);
+    photonTracers.push({ points: buf, nPts, dot });
+  }
+}
+
+function updateStats() {
+  $('iHorizon').textContent = horizon_radius(spin).toFixed(3);
+  $('iIsco').textContent = isco_radius(spin, true).toFixed(3);
+  $('iBcrit').textContent = (3 * Math.sqrt(3)).toFixed(3);
+}
+
+// ── Initial build ───────────────────────────────────────
+rebuildBH();
+rebuildOrbits();
+rebuildPhotons();
+updateStats();
+
+// ── Slider events ───────────────────────────────────────
+sSpin.addEventListener('input', () => {
+  spin = parseFloat(sSpin.value);
+  vSpin.textContent = spin.toFixed(2);
+  rebuildBH(); rebuildOrbits(); rebuildPhotons(); updateStats();
+});
+sRays.addEventListener('input', () => {
+  numRays = parseInt(sRays.value);
+  vRays.textContent = numRays;
+  rebuildPhotons();
+});
+sMaxB.addEventListener('input', () => {
+  maxB = parseFloat(sMaxB.value);
+  vMaxB.textContent = maxB.toFixed(1);
+  rebuildPhotons();
+});
+sDist.addEventListener('input', () => {
+  srcR = parseFloat(sDist.value);
+  vDist.textContent = srcR;
+  rebuildPhotons();
+});
+sSpeed.addEventListener('input', () => {
+  animSpeed = parseFloat(sSpeed.value);
+  vSpeed.textContent = animSpeed.toFixed(1);
+});
+
+// ── Animation loop ──────────────────────────────────────
+function animate() {
+  requestAnimationFrame(animate);
+
+  for (const tr of orbitTracers) {
+    tr.t = (tr.t + tr.speed * animSpeed * 0.3) % tr.nPts;
+    const i = Math.floor(tr.t) * 3;
+    if (i + 2 < tr.points.length) {
+      tr.dot.position.set(tr.points[i], tr.points[i+1], tr.points[i+2]);
+    }
+  }
+
+  if (animSpeed > 0) {
+    photonTime += animSpeed;
+    let allDone = true;
+    for (const tr of photonTracers) {
+      const idx = Math.floor(photonTime);
+      if (idx < tr.nPts) {
+        allDone = false;
+        const i = idx * 3;
+        tr.dot.position.set(tr.points[i], tr.points[i+1], tr.points[i+2]);
+        tr.dot.visible = true;
+      } else {
+        tr.dot.visible = false;
+      }
+    }
+    if (allDone) photonTime = 0;
+  }
+
+  controls.update();
+  composer.render();
+}
+animate();
+
+addEventListener('resize', () => {
+  camera.aspect = innerWidth / innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(innerWidth, innerHeight);
+  composer.setSize(innerWidth, innerHeight);
+});
+</script>
+</body>
+</html>
