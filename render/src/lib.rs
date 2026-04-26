@@ -49,7 +49,7 @@ fn render_pixel<F: MetricField>(
     j: usize,
 ) -> f64 {
     // generate initial conditions for photon at this pixel
-    let (x_cam, k_cam) = inputs.camera.pixel_to_initial_state(inputs.field, i, j);
+    let (x_cam, k_cam) = inputs.camera.pixel_to_initial_state(camera_tetrad, i, j);
     let initial_state = State::new(x_cam, k_cam);
 
     // integrate geodesic

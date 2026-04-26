@@ -4,8 +4,8 @@
 //! choose pixel color based on that
 use std::f64::consts::FRAC_PI_4;
 
-use grr_core::math::{Vector, field::MetricField};
-use grr_tetrad::zamo_tetrad;
+use grr_core::math::Vector;
+use grr_tetrad::Tetrad;
 
 #[cfg(test)]
 mod tests;
@@ -46,14 +46,9 @@ impl Camera {
         self.height = height;
     }
 
-    pub fn pixel_to_initial_state<F: MetricField>(
-        &self,
-        field: &F,
-        i: usize,
-        j: usize,
-    ) -> (Vector, Vector) {
+    pub fn pixel_to_initial_state(&self, tetrad: &Tetrad, i: usize, j: usize) -> (Vector, Vector) {
         let x_cam = [0.0, self.r_cam, self.th_cam, 0.0];
-        let k = self.pixel_to_coordinate_momentum(field, i, j);
+        let k = self.pixel_to_coordinate_momentum(&tetrad, i, j);
         (x_cam, k)
     }
 
@@ -90,15 +85,7 @@ impl Camera {
         [-1.0, cos_a * cos_b, sin_b, sin_a * cos_b]
     }
 
-    // TODO (perf): this is rebuilding the tetrad every single time. no bueno.
-    fn pixel_to_coordinate_momentum<F: MetricField>(
-        &self,
-        field: &F,
-        i: usize,
-        j: usize,
-    ) -> Vector {
-        let x_cam = [0.0, self.r_cam, self.th_cam, 0.0];
-        let tetrad = zamo_tetrad(field, &x_cam);
+    fn pixel_to_coordinate_momentum(&self, tetrad: &Tetrad, i: usize, j: usize) -> Vector {
         let n = self.tetrad_frame_direction(i, j);
         let mut k = [0.0; 4];
         for a in 0..4 {
