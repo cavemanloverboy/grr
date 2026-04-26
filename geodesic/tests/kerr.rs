@@ -66,4 +66,9 @@ fn test_kerr_intersect_horizon() {
     let orig_energy = state.energy(&field);
     let final_energy = result.final_state.energy(&field);
     assert!(approx_eq(orig_energy, final_energy, 1e-8), "energy not conserved");
+
+    // angular momentum conserved
+    let orig_ang_mom = state.angular_momentum_z(&field);
+    let final_ang_mom = result.final_state.angular_momentum_z(&field);
+    assert!(approx_eq(orig_ang_mom, final_ang_mom, 1e-8), "energy not conserved");
 }
