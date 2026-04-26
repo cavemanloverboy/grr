@@ -1,5 +1,7 @@
 use grr_core::math::{Vector, field::MetricField, metric::Metric};
 
+pub mod emission;
+
 pub struct Disk {
     pub r_in: f64,
     pub r_out: f64,
