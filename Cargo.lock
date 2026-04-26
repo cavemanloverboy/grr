@@ -3,6 +3,14 @@
 version = 4
 
 [[package]]
+name = "grr-camera"
+version = "0.1.0"
+dependencies = [
+ "grr-core",
+ "grr-tetrad",
+]
+
+[[package]]
 name = "grr-core"
 version = "0.1.0"
 
