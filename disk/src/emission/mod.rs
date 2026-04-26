@@ -84,3 +84,9 @@ pub fn flux(r: f64, a_star: f64) -> f64 {
     let x = r.sqrt();
     flux_f(x, a_star) / (4.0 * PI * x * x)
 }
+
+/// bolometric specific intensity emitted by the disk in its rest frame.
+/// for a lambertian (isotropic) thin disk, I_em = F / pi.
+pub fn bolometric_intensity(r: f64, a_star: f64) -> f64 {
+    flux(r, a_star) / PI
+}
