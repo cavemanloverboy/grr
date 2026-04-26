@@ -7,6 +7,7 @@ members = [
     "integrator",
     "render",
     "tetrad",
+    "png",
 ]
 
 
@@ -18,3 +19,4 @@ grr-geodesic = { path = "geodesic" }
 grr-disk = { path = "disk" }
 grr-tetrad = { path = "tetrad" }
 grr-render = { path = "render" }
+grr-png = { path = "png" }
