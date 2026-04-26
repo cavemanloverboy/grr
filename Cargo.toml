@@ -1,7 +1,20 @@
 [workspace]
-members = ["camera","core", "disk", "geodesic", "integrator", "tetrad"]
+members = [
+    "camera",
+    "core",
+    "disk",
+    "geodesic",
+    "integrator",
+    "render",
+    "tetrad",
+]
 
 
 [workspace.dependencies]
 grr-core = { path = "core" }
 grr-integrator = { path = "integrator" }
+grr-camera = { path = "camera" }
+grr-geodesic = { path = "geodesic" }
+grr-disk = { path = "disk" }
+grr-tetrad = { path = "tetrad" }
+grr-render = { path = "render" }

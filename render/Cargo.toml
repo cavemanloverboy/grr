@@ -1,0 +1,12 @@
+[package]
+name = "grr-render"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+grr-camera = { workspace = true }
+grr-core = { workspace = true }
+grr-disk = { workspace = true }
+grr-geodesic = { workspace = true }
+grr-integrator = { workspace = true }
+grr-tetrad = { workspace = true }

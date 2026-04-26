@@ -34,6 +34,18 @@ name = "grr-integrator"
 version = "0.1.0"
 
 [[package]]
+name = "grr-render"
+version = "0.1.0"
+dependencies = [
+ "grr-camera",
+ "grr-core",
+ "grr-disk",
+ "grr-geodesic",
+ "grr-integrator",
+ "grr-tetrad",
+]
+
+[[package]]
 name = "grr-tetrad"
 version = "0.1.0"
 dependencies = [

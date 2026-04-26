@@ -11,7 +11,7 @@ use grr_tetrad::zamo_tetrad;
 mod tests;
 
 pub struct Camera {
-    r_cam: f64,
+    pub r_cam: f64,
     th_cam: f64,
     field_of_view: f64,
     width: u16,
@@ -57,6 +57,14 @@ impl Camera {
         (x_cam, k)
     }
 
+    pub fn image_dims(&self) -> (usize, usize) {
+        (self.width as usize, self.height as usize)
+    }
+
+    pub fn position(&self) -> [f64; 4] {
+        [0.0, self.r_cam, self.th_cam, 0.0]
+    }
+
     /// sky-plane angles (α , β) in radians for pixel (i, j).
     /// α  is the horizontal offset, β the vertical, both measured from
     /// the optical axis. (0, 0) is the image center.
@@ -82,6 +90,7 @@ impl Camera {
         [-1.0, cos_a * cos_b, sin_b, sin_a * cos_b]
     }
 
+    // TODO (perf): this is rebuilding the tetrad every single time. no bueno.
     fn pixel_to_coordinate_momentum<F: MetricField>(
         &self,
         field: &F,
