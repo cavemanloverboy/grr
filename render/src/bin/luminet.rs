@@ -13,7 +13,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     let r_cam = 60f64;
     let th_cam = 80f64.to_radians();
     let mut camera = Camera::new(r_cam, th_cam);
-    camera.update_image_res(1920, 1080);
+    camera.update_image_res(3840, 2160);
 
     let a = 0.0;
     let r_isco = r_isco(a);
