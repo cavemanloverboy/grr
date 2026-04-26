@@ -1,6 +1,6 @@
 //! TODO (feat): need to add conserved quantity monitoring
 
-use std::f64::consts::PI;
+use std::f64::consts::{FRAC_PI_2, PI};
 
 use grr_core::math::field::MetricField;
 use grr_integrator::dp54::{Dp54Controller, dp54_step};
@@ -67,40 +67,54 @@ pub enum TerminationReason {
     // TODO (remove). adding this in case we need it for debugging
     MaxStepsEvent,
 }
+
 impl TerminationReason {
+    /// returns (reason, lambda_offset_from_step_start, exact_state).
+    /// for horizon/escape, offset = dl (end of step) and state = new step.
+    /// for disk crossing, offset and state come from sub-step bisection.
     #[inline(always)]
-    fn check(
+    fn check<F: Fn(f64, &[f64; 8]) -> [f64; 8]>(
         cfg: &GeodesicConfig,
+        rhs: &F,
         state: &[f64; 8],
         old_state: &[f64; 8],
-    ) -> Option<TerminationReason> {
-        let [_, r, th, _, _, kr, _, _] = state;
+        k1_old: &[f64; 8],
+        dl: f64,
+    ) -> Option<(TerminationReason, f64, [f64; 8])> {
+        let [_, r, th, _, _, kr, _, _] = *state;
         let old_th = old_state[2];
 
         // check HorizonEvent
         // 1. r drops below TERMINATION_RADIUS_FACTOR * r_plus (outer horizon).
-        let horizon_event = *r < TERMINATION_RADIUS_FACTOR * cfg.r_plus;
+        let horizon_event = r < TERMINATION_RADIUS_FACTOR * cfg.r_plus;
         if horizon_event {
-            return Some(TerminationReason::HorizonEvent);
+            return Some((TerminationReason::HorizonEvent, dl, *state));
         }
 
         // check EscapeEvent
         // 1. r > 2 * r_cam AND
         // 2. k^r > 0 (radially outgoing).
-        let escape_event = (*r > 2.0 * cfg.r_cam) && (*kr > 0.0);
+        let escape_event = (r > 2.0 * cfg.r_cam) && (kr > 0.0);
         if escape_event {
-            return Some(TerminationReason::EscapeEvent);
+            return Some((TerminationReason::EscapeEvent, dl, *state));
         }
 
         // check EquatorialCrossingEvent
         // 1. θ crosses π/2 (signed change between steps) AND
         // 2. r ∈ [r_in, r_out] at the crossing
-        let th_crossed = (old_th - PI / 2.0) * (th - PI / 2.0) < 0.0;
-        let within_ring = (*r >= cfg.r_in) && *r <= cfg.r_out;
+        let target = FRAC_PI_2;
+        let th_crossed = (old_th - target) * (th - target) < 0.0;
+        let within_ring = (r >= cfg.r_in) && r <= cfg.r_out;
         let equatorial_crossing_event = th_crossed && within_ring;
         if equatorial_crossing_event {
-            // TODO: bisect to find exact λ_crossing
-            return Some(TerminationReason::EquatorialCrossingEvent);
+            // bisect on λ in [0, dl] (relative to old_state) to find exact crossing.
+            let (lambda_offset, exact_state) =
+                bisect_disk_crossing(rhs, old_state, k1_old, state, dl);
+            return Some((
+                TerminationReason::EquatorialCrossingEvent,
+                lambda_offset,
+                exact_state,
+            ));
         }
 
         None
@@ -146,19 +160,21 @@ pub fn integrate_geodesic_dp54<F: MetricField>(
         if err_norm <= 1.0 {
             // accept
             n_accepted += 1;
-            lambda += dl;
 
-            if let Some(reason) = TerminationReason::check(cfg, &new_state, &state.0) {
-                state = State(new_state);
+            if let Some((reason, lambda_offset, exact_state)) =
+                TerminationReason::check(cfg, &integrand, &new_state, &state.0, &k1, dl)
+            {
                 return GeodesicResult {
-                    final_state: state,
-                    final_lambda: lambda,
+                    final_state: State(exact_state),
+                    final_lambda: lambda + lambda_offset,
                     termination: reason,
                     n_accepted,
                     n_rejected,
                 };
             }
+
             // commit and continue
+            lambda += dl;
             state = State(new_state);
             k1 = k7;
             dl *= ctrl.factor(err_norm, err_prev);
@@ -177,4 +193,46 @@ fn geodesic_rhs_closure<'a, F: MetricField>(
     field: &'a F,
 ) -> impl Fn(f64, &[f64; 8]) -> [f64; 8] + 'a {
     move |_t, state| State(*state).geodesic_rhs(field).0
+}
+
+/// bisect on λ in [0, dl_step] starting from state_old to find where
+/// θ = π/2 exactly. returns (λ_offset, state_at_crossing).
+///
+/// each iteration takes a fresh dp54 step from state_old by dl_mid.
+/// recomputing from state_old (rather than chaining) keeps integration
+/// error from accumulating across the bisection.
+fn bisect_disk_crossing<F: Fn(f64, &[f64; 8]) -> [f64; 8]>(
+    rhs: &F,
+    state_old: &[f64; 8],
+    k1_old: &[f64; 8],
+    state_new: &[f64; 8],
+    dl_step: f64,
+) -> (f64, [f64; 8]) {
+    let target = PI / 2.0;
+    let theta_old_offset = state_old[2] - target;
+
+    let mut dl_lo = 0.0;
+    let mut dl_hi = dl_step;
+    let mut state_at_hi = *state_new;
+
+    for _ in 0..40 {
+        let dl_mid = 0.5 * (dl_lo + dl_hi);
+        let (state_mid, _, _) = dp54_step(rhs, 0.0, state_old, dl_mid, *k1_old);
+        let theta_mid_offset = state_mid[2] - target;
+
+        if theta_old_offset * theta_mid_offset < 0.0 {
+            // crossing is in [dl_lo, dl_mid]
+            dl_hi = dl_mid;
+            state_at_hi = state_mid;
+        } else {
+            // crossing is in [dl_mid, dl_hi]
+            dl_lo = dl_mid;
+        }
+
+        if (dl_hi - dl_lo) < 1e-12 {
+            return (dl_hi, state_at_hi);
+        }
+    }
+
+    (dl_hi, state_at_hi)
 }
